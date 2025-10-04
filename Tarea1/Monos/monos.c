@@ -1,3 +1,9 @@
+/*
+ *  Solución al problema de los monos (una sola cuerda)
+ *  CI-0117 Programación concurrente y paralela
+ *  Fecha: 2025/Set/16
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -6,101 +12,157 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
+#include <time.h>
+#include <stdbool.h>
 
-#define MONOS 10
-#define MaxEnCuerda 3
-#define DirIzqADer 1
-#define DirDerAIzq 2
+#define MONOS 10            // Cantidad de monos a crear
+#define MaxEnCuerda 3       // Capacidad máxima de la cuerda
+#define CambioDireccion 5   // Cantidad de cruces antes de cambiar dirección
 
-enum Direccion { IzqDer, DerIzq };
+#define IzqDer 1
+#define DerIzq 2
 
+
+// Estructura de memoria compartida
 struct compartido {
-   int monos_en_cuerda;
-   int direccion_actual;
+    int enCuerda;       // Monos actualmente en la cuerda
+    int direccion;      // 0 = libre, 1 = IzqDer, 2 = DerIzq
+    int cruzados;       // Cuántos han cruzado en esta dirección
 };
 
 struct compartido *barranco;
 
-void down(int semid) {
-   struct sembuf op = {0, -1, 0};
-   semop(semid, &op, 1);
+
+// Funciones para manejar semáforos (System V)
+
+int semId;
+
+void down(int id, int n) {
+    struct sembuf op = {n, -1, 0};
+    semop(id, &op, 1);
 }
 
-void up(int semid) {
-   struct sembuf op = {0, 1, 0};
-   semop(semid, &op, 1);
+void up(int id, int n) {
+    struct sembuf op = {n, 1, 0};
+    semop(id, &op, 1);
 }
 
-int mono(int id, int dir, int semId) {
-   printf("Mono %2d quiere cruzar %s\n", id,
-          (dir == IzqDer) ? "de izquierda a derecha" : "de derecha a izquierda");
 
-   int cruzando = 0;
+// Proceso de cada mono
 
-   while (!cruzando) {
-      down(semId);
+int mono(int id, int dir) {
 
-      if (barranco->monos_en_cuerda == 0) {
-         barranco->direccion_actual = dir;
-         barranco->monos_en_cuerda++;
-         cruzando = 1;
-         printf("Mono %2d entra (primero en la cuerda)\n", id);
-      } else if (barranco->direccion_actual == dir &&
-                 barranco->monos_en_cuerda < MaxEnCuerda) {
-         barranco->monos_en_cuerda++;
-         cruzando = 1;
-         printf("Mono %2d entra (mismo sentido)\n", id);
-      }
+    if (dir == IzqDer)
+        printf("Mono %2d quiere cruzar de izquierda a derecha\n", id);
+    else
+        printf("Mono %2d quiere cruzar de derecha a izquierda\n", id);
 
-      up(semId);
+    bool entro = false;
 
-      if (!cruzando) {
-         printf("Mono %2d espera, cuerda ocupada o sentido contrario...\n", id);
-         sleep(1);
-      }
-   }
+    while (!entro) {
+        down(semId, 0);  // entra en sección crítica
 
-   printf("Mono %2d cruzando...\n", id);
-   sleep(2);
+        // Condiciones para poder entrar a la cuerda
+        if (barranco->enCuerda < MaxEnCuerda &&
+            (barranco->direccion == 0 || barranco->direccion == dir) &&
+            (barranco->cruzados < CambioDireccion || barranco->direccion == 0)) {
 
-   down(semId);
-   barranco->monos_en_cuerda--;
-   if (barranco->monos_en_cuerda == 0)
-      barranco->direccion_actual = 0;
-   up(semId);
+            // Si la cuerda estaba libre, fijar dirección
+            if (barranco->direccion == 0) {
+                barranco->direccion = dir;
+                barranco->cruzados = 0;
+            }
 
-   printf("Mono %2d terminó de cruzar\n", id);
-   _exit(0);
+            barranco->enCuerda++;
+            entro = true;
+
+            printf("Mono %2d entra a la cuerda (%s). En cuerda: %d\n",
+                   id,
+                   dir == IzqDer ? "Izq->Der" : "Der->Izq",
+                   barranco->enCuerda);
+        }
+
+        up(semId, 0);
+
+        if (!entro)
+            usleep(100000); // espera antes de volver a intentar
+    }
+
+    // Cruzando el barranco
+    sleep(1 + rand() % 3);
+
+    // Sale de la cuerda
+    down(semId, 0);
+
+    barranco->enCuerda--;
+    barranco->cruzados++;
+
+    printf("Mono %2d termina de cruzar. En cuerda: %d\n", id, barranco->enCuerda);
+
+    // Si ya cruzaron R monos o la cuerda quedó vacía, liberar dirección
+    if (barranco->enCuerda == 0 && barranco->cruzados >= CambioDireccion) {
+        printf("Cambio de dirección!\n");
+        barranco->direccion = 0;
+        barranco->cruzados = 0;
+    }
+
+    up(semId, 0);
+
+    _exit(0); // Proceso hijo termina
 }
 
-int main() {
-   int m, shmId, semId, resultado;
 
-   shmId = shmget(IPC_PRIVATE, sizeof(struct compartido), IPC_CREAT | 0600);
-   barranco = (struct compartido *) shmat(shmId, NULL, 0);
+// Programa principal
 
-   barranco->monos_en_cuerda = 0;
-   barranco->direccion_actual = 0;
+int main(int argc, char **argv) {
+    int m, monos, shmId, resultado;
 
-   semId = semget(IPC_PRIVATE, 1, IPC_CREAT | 0600);
-   semctl(semId, 0, SETVAL, 1);
+    shmId = shmget(IPC_PRIVATE, sizeof(struct compartido), IPC_CREAT | 0600);
+    if (shmId == -1) {
+        perror("main shared memory create");
+        exit(1);
+    }
 
-   printf("Creando manada de %d monos\n", MONOS);
+    barranco = (struct compartido *)shmat(shmId, NULL, 0);
+    if ((void *)barranco == (void *)-1) {
+        perror("main Shared Memory attach");
+        exit(1);
+    }
 
-   for (m = 1; m <= MONOS; m++) {
-      if (!fork()) {
-         srandom(getpid());
-         int dir = (random() % 2 == 0) ? IzqDer : DerIzq;
-         mono(m, dir, semId);
-      }
-   }
+    // Inicializar variables compartidas
+    barranco->enCuerda = 0;
+    barranco->direccion = 0;
+    barranco->cruzados = 0;
 
-   for (m = 1; m <= MONOS; m++)
-      wait(&resultado);
+    // Crear semáforo (1 para mutex)
+    semId = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
+    semctl(semId, 0, SETVAL, 1);
 
-   semctl(semId, 0, IPC_RMID);
-   shmdt(barranco);
-   shmctl(shmId, IPC_RMID, 0);
+    // Número de monos por parámetro
+    monos = (argc > 1) ? atoi(argv[1]) : MONOS;
 
-   return 0;
+    printf("Creando una manada de %d monos\n", monos);
+
+    // Crear los procesos (fork por cada mono)
+    for (m = 1; m <= monos; m++) {
+        if (!fork()) {
+            srand(getpid());
+            int dir = (rand() % 2) ? IzqDer : DerIzq;
+            mono(m, dir);
+        }
+    }
+
+    // Esperar a todos los monos
+    for (m = 1; m <= monos; m++) {
+        wait(&resultado);
+    }
+
+    printf("\nTodos los monos cruzaron con éxito!\n");
+
+    // Limpieza
+    shmdt(barranco);
+    shmctl(shmId, IPC_RMID, 0);
+    semctl(semId, 0, IPC_RMID);
+
+    return 0;
 }

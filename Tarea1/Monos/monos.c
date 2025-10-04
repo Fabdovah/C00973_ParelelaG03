@@ -19,7 +19,7 @@ struct compartido {
    int direccion_actual;
 };
 
-struct compartido * barranco;
+struct compartido *barranco;
 
 void down(int semid) {
    struct sembuf op = {0, -1, 0};
@@ -35,9 +35,38 @@ int mono(int id, int dir, int semId) {
    printf("Mono %2d quiere cruzar %s\n", id,
           (dir == IzqDer) ? "de izquierda a derecha" : "de derecha a izquierda");
 
+   int cruzando = 0;
+
+   while (!cruzando) {
+      down(semId);
+
+      if (barranco->monos_en_cuerda == 0) {
+         barranco->direccion_actual = dir;
+         barranco->monos_en_cuerda++;
+         cruzando = 1;
+         printf("Mono %2d entra (primero en la cuerda)\n", id);
+      } else if (barranco->direccion_actual == dir &&
+                 barranco->monos_en_cuerda < MaxEnCuerda) {
+         barranco->monos_en_cuerda++;
+         cruzando = 1;
+         printf("Mono %2d entra (mismo sentido)\n", id);
+      }
+
+      up(semId);
+
+      if (!cruzando) {
+         printf("Mono %2d espera, cuerda ocupada o sentido contrario...\n", id);
+         sleep(1);
+      }
+   }
+
+   printf("Mono %2d cruzando...\n", id);
+   sleep(2);
+
    down(semId);
-   printf("Mono %2d entra a la cuerda\n", id);
-   sleep(1); // simulamos el cruce
+   barranco->monos_en_cuerda--;
+   if (barranco->monos_en_cuerda == 0)
+      barranco->direccion_actual = 0;
    up(semId);
 
    printf("Mono %2d terminó de cruzar\n", id);

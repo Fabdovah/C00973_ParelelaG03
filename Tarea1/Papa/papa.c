@@ -1,5 +1,4 @@
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ipc.h>
@@ -33,11 +32,11 @@ int participante(int id, int buzon, int total) {
       msgrcv(buzon, &msg, sizeof(msg) - sizeof(long), id + 1, 0);
 
       if (!msg.valido) {
-         printf("Participante %d recibió mensaje inválido.\n", id);
+         printf(" Participante %d recibió mensaje inválido del emisor %d.\n", id, msg.emisor);
          continue;
       }
 
-      if (msg.valor < 0) { // juego termina
+      if (msg.valor < 0) {
          printf("Participante %d recibió aviso de fin del juego.\n", id);
          break;
       }
@@ -47,7 +46,7 @@ int participante(int id, int buzon, int total) {
          printf("Participante %d cambió la papa a %d\n", id, msg.valor);
 
          if (msg.valor == 1) {
-            printf("💥 La papa explotó en el participante %d\n", id);
+            printf(" La papa explotó en el participante %d\n", id);
             activo = false;
             msg.valor = rand() % 20 + 5;
          }
@@ -61,10 +60,19 @@ int participante(int id, int buzon, int total) {
    _exit(0);
 }
 
-int invasor(int id) {
+int invasor(int buzon, int total) {
+   struct RondaPapa msg;
+   srand(getpid());
    sleep(3);
-   printf("Invasor %d activo (sin comportamiento)\n", id);
-   _exit(0);
+   while (1) {
+      sleep(rand() % 3 + 2);
+      msg.mtype = (rand() % total) + 1;
+      msg.valor = rand() % 100 + 1;
+      msg.emisor = -999;
+      msg.valido = false;
+      msgsnd(buzon, &msg, sizeof(msg) - sizeof(long), 0);
+      printf(" Invasor envió mensaje falso al participante %ld\n", msg.mtype - 1);
+   }
 }
 
 int main(int argc, char **argv) {
@@ -78,18 +86,18 @@ int main(int argc, char **argv) {
       if (!fork()) participante(i, buzon, participantes);
    }
 
-   if (!fork()) invasor(participantes);
+   if (!fork()) invasor(buzon, participantes);
 
    int primero = rand() % participantes;
    struct RondaPapa msg = { .mtype = primero + 1, .valor = valorInicial, .emisor = -1, .valido = true };
    printf("El juego inicia con el participante %d y la papa = %d\n", primero, valorInicial);
    msgsnd(buzon, &msg, sizeof(msg) - sizeof(long), 0);
 
-   sleep(10); // simulación
-   msg.mtype = 0;
-   msg.valor = -1; // valor negativo = fin
+   sleep(20);
+   msg.valor = -1;
    for (i = 0; i < participantes; i++) {
       msg.mtype = i + 1;
+      msg.valido = true;
       msgsnd(buzon, &msg, sizeof(msg) - sizeof(long), 0);
    }
 

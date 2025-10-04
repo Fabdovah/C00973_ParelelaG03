@@ -1,5 +1,5 @@
 /*
- *  Solución al problema de los monos (una sola cuerda)
+ *  Solución al problema de los monos (dos cuerdas)
  *  CI-0117 Programación concurrente y paralela
  *  Fecha: 2025/Set/16
  */
@@ -16,14 +16,15 @@
 #include <stdbool.h>
 
 #define MONOS 10            // Cantidad de monos a crear
-#define MaxEnCuerda 3       // Capacidad máxima de la cuerda
+#define MaxEnCuerda 3       // Capacidad máxima de cada cuerda
 #define CambioDireccion 5   // Cantidad de cruces antes de cambiar dirección
 
 #define IzqDer 1
 #define DerIzq 2
 
 
-// Estructura de memoria compartida
+// Estructura de memoria compartida para cada cuerda
+
 struct compartido {
     int enCuerda;       // Monos actualmente en la cuerda
     int direccion;      // 0 = libre, 1 = IzqDer, 2 = DerIzq
@@ -35,54 +36,55 @@ struct compartido *barranco;
 
 // Funciones para manejar semáforos (System V)
 
-int semId;
+int semId[2];  // Un semáforo para cada cuerda
 
 void down(int id, int n) {
-    struct sembuf op = {n, -1, 0};
+    struct sembuf op = {0, -1, 0};
     semop(id, &op, 1);
 }
 
 void up(int id, int n) {
-    struct sembuf op = {n, 1, 0};
+    struct sembuf op = {0, 1, 0};
     semop(id, &op, 1);
 }
 
 
 // Proceso de cada mono
 
-int mono(int id, int dir) {
+int mono(int id, int dir, int cuerda) {
 
     if (dir == IzqDer)
-        printf("Mono %2d quiere cruzar de izquierda a derecha\n", id);
+        printf("Mono %2d eligió cuerda %d y quiere cruzar de izquierda a derecha\n", id, cuerda + 1);
     else
-        printf("Mono %2d quiere cruzar de derecha a izquierda\n", id);
+        printf("Mono %2d eligió cuerda %d y quiere cruzar de derecha a izquierda\n", id, cuerda + 1);
 
     bool entro = false;
 
     while (!entro) {
-        down(semId, 0);  // entra en sección crítica
+        down(semId[cuerda], 0);  // entra en sección crítica para esa cuerda
 
         // Condiciones para poder entrar a la cuerda
-        if (barranco->enCuerda < MaxEnCuerda &&
-            (barranco->direccion == 0 || barranco->direccion == dir) &&
-            (barranco->cruzados < CambioDireccion || barranco->direccion == 0)) {
+        if (barranco[cuerda].enCuerda < MaxEnCuerda &&
+            (barranco[cuerda].direccion == 0 || barranco[cuerda].direccion == dir) &&
+            (barranco[cuerda].cruzados < CambioDireccion || barranco[cuerda].direccion == 0)) {
 
             // Si la cuerda estaba libre, fijar dirección
-            if (barranco->direccion == 0) {
-                barranco->direccion = dir;
-                barranco->cruzados = 0;
+            if (barranco[cuerda].direccion == 0) {
+                barranco[cuerda].direccion = dir;
+                barranco[cuerda].cruzados = 0;
             }
 
-            barranco->enCuerda++;
+            barranco[cuerda].enCuerda++;
             entro = true;
 
-            printf("Mono %2d entra a la cuerda (%s). En cuerda: %d\n",
+            printf("Mono %2d entra a la cuerda %d (%s). En cuerda: %d\n",
                    id,
+                   cuerda + 1,
                    dir == IzqDer ? "Izq->Der" : "Der->Izq",
-                   barranco->enCuerda);
+                   barranco[cuerda].enCuerda);
         }
 
-        up(semId, 0);
+        up(semId[cuerda], 0);
 
         if (!entro)
             usleep(100000); // espera antes de volver a intentar
@@ -92,21 +94,22 @@ int mono(int id, int dir) {
     sleep(1 + rand() % 3);
 
     // Sale de la cuerda
-    down(semId, 0);
+    down(semId[cuerda], 0);
 
-    barranco->enCuerda--;
-    barranco->cruzados++;
+    barranco[cuerda].enCuerda--;
+    barranco[cuerda].cruzados++;
 
-    printf("Mono %2d termina de cruzar. En cuerda: %d\n", id, barranco->enCuerda);
+    printf("Mono %2d termina de cruzar en cuerda %d. En cuerda: %d\n",
+           id, cuerda + 1, barranco[cuerda].enCuerda);
 
     // Si ya cruzaron R monos o la cuerda quedó vacía, liberar dirección
-    if (barranco->enCuerda == 0 && barranco->cruzados >= CambioDireccion) {
-        printf("Cambio de dirección!\n");
-        barranco->direccion = 0;
-        barranco->cruzados = 0;
+    if (barranco[cuerda].enCuerda == 0 && barranco[cuerda].cruzados >= CambioDireccion) {
+        printf("Cambio de dirección en cuerda %d!\n", cuerda + 1);
+        barranco[cuerda].direccion = 0;
+        barranco[cuerda].cruzados = 0;
     }
 
-    up(semId, 0);
+    up(semId[cuerda], 0);
 
     _exit(0); // Proceso hijo termina
 }
@@ -117,7 +120,7 @@ int mono(int id, int dir) {
 int main(int argc, char **argv) {
     int m, monos, shmId, resultado;
 
-    shmId = shmget(IPC_PRIVATE, sizeof(struct compartido), IPC_CREAT | 0600);
+    shmId = shmget(IPC_PRIVATE, 2 * sizeof(struct compartido), IPC_CREAT | 0600);
     if (shmId == -1) {
         perror("main shared memory create");
         exit(1);
@@ -129,14 +132,16 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    // Inicializar variables compartidas
-    barranco->enCuerda = 0;
-    barranco->direccion = 0;
-    barranco->cruzados = 0;
+    // Inicializar ambas cuerdas
+    for (int i = 0; i < 2; i++) {
+        barranco[i].enCuerda = 0;
+        barranco[i].direccion = 0;
+        barranco[i].cruzados = 0;
 
-    // Crear semáforo (1 para mutex)
-    semId = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
-    semctl(semId, 0, SETVAL, 1);
+        // Crear semáforo para cada cuerda
+        semId[i] = semget(IPC_PRIVATE, 1, IPC_CREAT | 0666);
+        semctl(semId[i], 0, SETVAL, 1);
+    }
 
     // Número de monos por parámetro
     monos = (argc > 1) ? atoi(argv[1]) : MONOS;
@@ -148,7 +153,8 @@ int main(int argc, char **argv) {
         if (!fork()) {
             srand(getpid());
             int dir = (rand() % 2) ? IzqDer : DerIzq;
-            mono(m, dir);
+            int cuerda = rand() % 2;  // elegir cuerda 0 o 1 aleatoriamente
+            mono(m, dir, cuerda);
         }
     }
 
@@ -162,7 +168,9 @@ int main(int argc, char **argv) {
     // Limpieza
     shmdt(barranco);
     shmctl(shmId, IPC_RMID, 0);
-    semctl(semId, 0, IPC_RMID);
+    for (int i = 0; i < 2; i++) {
+        semctl(semId[i], 0, IPC_RMID);
+    }
 
     return 0;
 }

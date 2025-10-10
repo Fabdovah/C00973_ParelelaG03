@@ -1,1 +1,32 @@
-aaa
+Fork
+g++ fork_example.cpp -o fork_example
+./fork_example
+
+Semaforo
+g++ ipc_semaphore.cpp -lpthread -o ipc_semaphore
+
+Buzones(pipes)
+g++ ipc_pipe.cpp -o ipc_pipe
+
+Memoria compartida
+g++ ipc_shared_memory.cpp -o ipc_shared_memory
+
+Monitores y locks
+g++ monitor_example.cpp -lpthread -o monitor_example
+
+Mutex
+g++ mutex_example.cpp -lpthread -o mutex_example
+
+Condition Variables
+g++ condition_variable.cpp -lpthread -o condition_variable
+
+Barriers
+g++ -std=c++20 barrier_example.cpp -lpthread -o barrier_example
+
+Pthreads
+g++ pthread_example.cpp -lpthread -o pthread_example
+
+
+
+
+

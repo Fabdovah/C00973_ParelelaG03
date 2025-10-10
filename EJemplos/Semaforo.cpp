@@ -1,3 +1,4 @@
+// Permiten coordinar procesos compartiendo recursos limitados.
 #include <iostream>
 #include <semaphore.h>
 #include <pthread.h>

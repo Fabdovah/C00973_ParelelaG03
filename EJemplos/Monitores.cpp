@@ -1,4 +1,4 @@
-//locks
+//Agrupa datos + métodos sincronizados usando locks (mutex) y condiciones.
 #include <iostream>
 #include <mutex>
 #include <condition_variable>

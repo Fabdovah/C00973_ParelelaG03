@@ -23,3 +23,8 @@ int main() {
         cout << "El proceso hijo ha terminado." << endl;
     }
 }
+/*
+Uso: dividir trabajo entre procesos independientes
+Clave: fork() retorna 0 al hijo y el pid del hijo al padre
+Crear un proceso que calcule el cuadrado de un número mientras el padre imprime los pares
+*/

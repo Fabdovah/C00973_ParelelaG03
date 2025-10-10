@@ -1,3 +1,4 @@
+//Bloquea secciones críticas para que solo un hilo acceda a la vez.
 #include <iostream>
 #include <thread>
 #include <mutex>

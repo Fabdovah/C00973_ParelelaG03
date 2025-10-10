@@ -1,3 +1,4 @@
+//Permite que varios procesos accedan al mismo espacio de memoria física.
 #include <iostream>
 #include <sys/ipc.h>
 #include <sys/shm.h>

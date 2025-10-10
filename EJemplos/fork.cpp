@@ -1,3 +1,4 @@
+//Crea un nuevo proceso hijo duplicando el proceso actual. Ambos (padre e hijo) continúan ejecutando el código después del fork().
 #include <iostream>
 #include <unistd.h>   // fork(), getpid()
 #include <sys/wait.h> // wait()

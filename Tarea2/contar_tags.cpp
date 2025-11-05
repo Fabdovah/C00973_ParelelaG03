@@ -4,10 +4,10 @@ Subo cada avance especificado para demostrar esto.
 Sé que esto fue completamente mi culpa y de ser posible me gustaría que se revisara
 */
 
-//Versión Final comentada
+//Versión 5 comentada
+// Eliminado cierto código
 //4 estrategias, cambios para mejores prácticas y el código comentado
-// Uso ejemplo:
-// ./contar -t=5 a.html b.html -e=1,2
+// Uso ejemplo: ./contar -t=5 a.html b.html -e=1,2
 
 #include <bits/stdc++.h>
 #include <pthread.h>

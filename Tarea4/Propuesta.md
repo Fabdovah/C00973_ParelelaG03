@@ -61,4 +61,4 @@ MPI_LCS(S1, S2):
         sincronizar
         juntar subrangos en cur (gather) → prev2 ← prev1 ; prev1 ← cur
     final: dp[n][m] está en la última diagonal; reconstrucción se hace (puede hacerse en rank 0) 
-            guardando las diagonales necesarias o recomputando ruta hacia atrás (ver limitaciones)
+            guardando las diagonales necesarias o recomputando ruta hacia atrás

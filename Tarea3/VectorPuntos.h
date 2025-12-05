@@ -1,11 +1,6 @@
-/**
- *   Representa un conjunto de puntos en dos dimensiones
- *
-**/
-
-
+// VectorPuntos.h
+#pragma once
 #include "Punto.h"
-
 
 class VectorPuntos {
    public:

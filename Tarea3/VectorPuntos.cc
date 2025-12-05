@@ -1,33 +1,25 @@
-/**
- *   Representa un conjunto de puntos representado por un vector
- *
-**/
-
+// VectorPuntos.cc
 #include <math.h>
 #include <cassert>
+#include <cstdlib>
 #include "VectorPuntos.h"
-
 
 /**
  *   Genera numeros random en punto flotante
- *
 **/
 double randf( double base ) {
-
    return base * rand() / (RAND_MAX - 1.);
-
 }
 
 /**
  *   Rellena el vector de puntos con puntos definidos en un circulo
- *
 **/
 VectorPuntos::VectorPuntos( long cantidad, double radio ) {
    long punto;
    double angulo, r, x, y;
 
    this->elementos = cantidad;
-   this->bloque = (Punto **) calloc( sizeof( Punto *), cantidad );
+   this->bloque = (Punto **) calloc( cantidad, sizeof( Punto * ) );
    for ( punto = 0; punto < cantidad; punto++ ) {
       angulo = randf( 2 * M_PI );
       r = randf( radio );
@@ -35,66 +27,45 @@ VectorPuntos::VectorPuntos( long cantidad, double radio ) {
       y = r * sin( angulo );
       this->bloque[ punto ] = new Punto( x, y );
    }
-
 }
-
 
 /**
  *   Rellena el vector de puntos con puntos colocados en el origen
- *
 **/
 VectorPuntos::VectorPuntos( long cantidad ) {
    long elemento;
 
    this->elementos = cantidad;
-   this->bloque = (Punto **) calloc( sizeof( Punto *), cantidad );
+   this->bloque = (Punto **) calloc( cantidad, sizeof( Punto * ) );
    for ( elemento = 0; elemento < cantidad; elemento++ ) {
       bloque[ elemento ] = new Punto( 0, 0 );
    }
-
 }
 
 
-/**
- *
-**/
 VectorPuntos::~VectorPuntos() {
    long elemento;
-
    for ( elemento = 0; elemento < this->elementos; elemento++ ) {
       delete bloque[ elemento ];
    }
-
    free( bloque );
-
 }
-
 
 /**
  *  Retorna el elemento en la posición indicada del vector
- *
 **/
 Punto * VectorPuntos::operator [] ( long posicion ) {
    assert( posicion >= 0 && posicion < elementos );
    return this->bloque[ posicion ];
-
 }
 
 
-/**
- *
-**/
 long VectorPuntos::demeTamano() {
-
    return this->elementos;
-
 }
-
-
 
 /**
  *  De los puntos en nuestro bloque encuentra el que esta más cercano al punto indicado como parámetro
- *
 **/
 long VectorPuntos::masCercano( Punto * punto ) {
    long elemento, posicion;
@@ -112,15 +83,10 @@ long VectorPuntos::masCercano( Punto * punto ) {
    }
 
    return posicion;
-
 }
-
 
 /**
  *   Suma de las distancias Euclidianas entre el centro y los elementos de su grupo
- *   @param	centro punto central (media) de cada grupo
- *   @param	clases	vector con los datos de pertenencia a las clases de los puntos
- *
 **/
 double VectorPuntos::variabilidad( Punto * centro, long clase, long * clases ) {
    long elemento;
@@ -135,12 +101,8 @@ double VectorPuntos::variabilidad( Punto * centro, long clase, long * clases ) {
    return sum;
 }
 
-
 /**
  *   La suma de todas la variabilidades de todos los grupos
- *   @param	muestras	vector con las muestras
- *   @param	clases	vector con los datos de pertenencia a las clases de los puntos
- *
 **/
 double VectorPuntos::disimilaridad( VectorPuntos * muestras, long * clases ) {
    long clase;
@@ -153,20 +115,9 @@ double VectorPuntos::disimilaridad( VectorPuntos * muestras, long * clases ) {
    }
 
    return sum;
-
 }
 
-
-/**
- *  Guarda en un archivo la colección de puntos en un imagen, para poder observar el trabajo realizado
- *  Utiliza otro elemento "posiciones" para indicar los centros y hacer las divisiones
- *  Utiliza el formato EPS por que se trata de un archivo de texto con estructura sencilla, aunque no es
- *  recomendado para uso general por problemas de seguridad
- *  @param	centros	vector con los puntos centrales de cada conjunto
- *  @param	posiciones	vector de longitud idéntica a this para determinar a cual clase pertenece el punto
- *  @param	fileName	nombre del archivo para guardar los datos, si existe se sobre-escribe
- *
-**/
+/* genEpsFormat  */
 #define H 400
 #define W 400
 void VectorPuntos::genEpsFormat( VectorPuntos * centros, long * clases, char * fileName ) {
@@ -176,15 +127,15 @@ void VectorPuntos::genEpsFormat( VectorPuntos * centros, long * clases, char * f
    FILE * eps;
 
    cantidadCentros = centros->demeTamano();
-   colors = (double *) calloc( sizeof(double) , 3 * cantidadCentros );
- 
+   colors = (double *) calloc( 3 * cantidadCentros, sizeof(double) );
+
    for ( clase = 0; clase < cantidadCentros; clase++) {
       pos = 3 * clase;
       colors[ pos + 0 ] = (3 * (clase + 1) % cantidadCentros ) / (double) cantidadCentros;
       colors[ pos + 1 ] = (7 * clase % cantidadCentros ) / (double) cantidadCentros;
       colors[ pos + 2 ] = (9 * clase % cantidadCentros ) / (double) cantidadCentros;
    }
- 
+
    maxX = maxX = -(minY = minY = HUGE_VAL);
    for ( pos = 0; pos < this->elementos; pos++) {
       if ( maxX < this->bloque[ pos ]->demeX() ) {
@@ -200,9 +151,13 @@ void VectorPuntos::genEpsFormat( VectorPuntos * centros, long * clases, char * f
          minY = this->bloque[ pos ]->demeY();
       }
    }
-   scale = W / (maxX - minX);
-   if ( scale > H / (maxY - minY) ) {
-      scale = H / (maxY - minY);
+   double spanX = (maxX - minX);
+   double spanY = (maxY - minY);
+   if (spanX == 0) spanX = 1;
+   if (spanY == 0) spanY = 1;
+   scale = W / spanX;
+   if ( scale > H / spanY ) {
+      scale = H / spanY;
    }
    cx = (maxX + minX) / 2;
    cy = (maxY + minY) / 2;
@@ -225,7 +180,7 @@ void VectorPuntos::genEpsFormat( VectorPuntos * centros, long * clases, char * f
          py = this->bloque[ pos ]->demeY();
          fprintf( eps, "%.3f %.3f c\n", (px - cx) * scale + W / 2, (py - cy) * scale + H / 2 );
       }
-// Print the centroid, using a small square
+      // Print
       px = (*centros)[ clase ]->demeX();
       py = (*centros)[ clase ]->demeY();
       fprintf( eps, "\n0 setgray %g %g s\n", (px - cx) * scale + W / 2, (py - cy) * scale + H / 2 );
@@ -234,5 +189,4 @@ void VectorPuntos::genEpsFormat( VectorPuntos * centros, long * clases, char * f
    fclose( eps );
 
    free(colors);
-
 }

@@ -1,81 +1,156 @@
-/**
- *  Programa base para la construcción de centros en una muestra de datos
- *  La muestra de datos está representada por la variable "puntos", todos los puntos generados al azar
- *  Los centros están representados por la variable "centros", todos los puntos colocados en el origen
- *
- *  CI0117 Programación paralela y concurrente
- *  Tercera tarea programada, grupos 2 y 3
- *  2020-ii
- *
-**/
-
+// medios.cc  (versión serial)
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <limits>
+#include <vector>
 #include "VectorPuntos.h"
 
-#define PUNTOS 100000
-#define CLASES 17
+// parámetros por defecto
+#define PUNTOS_DEF 100000
+#define CLASES_DEF 17
 
 
-int totalCambios = 0;	// Contabiliza la totalidad de los cambios realizados al grupo de puntos
+long asignarPuntosAClasesAleatorio(long *clases, long muestras, long casillas);
+long construirCentrosPorPromedio(VectorPuntos *centros, VectorPuntos *muestras, long *clases);
+long asignarClaseMasCercana(VectorPuntos *centros, VectorPuntos *muestras, long *clases);
+double disimilaridad(VectorPuntos *centros, VectorPuntos *muestras, long *clases);
 
-
-/**
- *  Coloca a cada punto en una clase de manera aleatoria
- *  Utiliza el vector de clases para realizar la asignación
- *  
-**/
-void asignarPuntosAClases( long * clases, int modo ) {
-   long clase, pto;
-
-   switch ( modo ) {
-      case 0:	// Aleatorio
-         for ( pto = 0; pto < PUNTOS; pto++ ) {
-            clase = rand() % CLASES;
-            clases[ pto ] = clase;
-         }
-         break;
-      case 1:	// A construir por los estudiantes
-         break;
-   }
-
+void uso(char *prog) {
+    printf("Uso: %s [N_muestras] [R_clases] [salida_eps] [initMethod]\n", prog);
+    printf(" initMethod: 0 = asignacion aleatoria de clases (default)\n");
+    printf("             1 = elegir R muestras iniciales como centros\n");
+    printf("Ejemplo: %s 50000 25 salida.eps 1\n", prog);
 }
 
+int main(int argc, char **argv) {
+    long muestras = (argc > 1) ? atol(argv[1]) : PUNTOS_DEF;
+    long casillas = (argc > 2) ? atol(argv[2]) : CLASES_DEF;
+    char *outname = (argc > 3) ? argv[3] : (char *)"ci0117.eps";
+    int initMethod = (argc > 4) ? atoi(argv[4]) : 0;
 
-/**
- *  Programa muestra
- *  Variable: clases, almacena la clase a la que pertenece cada punto, por lo que debe ser del mismo tamaño que las muestras
- *  Variable: contClases, almacena los valores para la cantidad de puntos que pertenecen a un conjunto
-**/
-int main( int cantidad, char ** parametros ) {
-   long cambios, clase, minimo, pto;
-   Punto * punto;
-   long casillas = CLASES;
-   long muestras = PUNTOS;
+    if (casillas <= 0 || muestras <= 0) {
+        uso(argv[0]);
+        return 1;
+    }
 
+    srand(time(NULL));
 
-// Procesar los parámetros del programa
+    VectorPuntos *muestrasVec = new VectorPuntos(muestras, 10.0);
+    VectorPuntos *mejoresCentros = new VectorPuntos(casillas);
+    long *mejoresClases = (long *) malloc(sizeof(long) * muestras);
 
-   VectorPuntos * centros = new VectorPuntos( casillas );
-   VectorPuntos * puntos  = new VectorPuntos( muestras, 10 );	// Genera un conjunto de puntos limitados a un círculo de radio 10
-   long clases[ muestras ];		// Almacena la clase a la que pertenece cada punto
-   long contClases[ casillas ];
+    double mejorDis = std::numeric_limits<double>::infinity();
+    long mejorTotalCambios = 0;
 
-   asignarPuntosAClases( clases, 0 );	// Asigna los puntos a las clases establecidas
+    // Hacer 3 intentos y quedarse con la mejor solución (menor disimilaridad)
+    const int intentos = 3;
+    for (int intento = 0; intento < intentos; intento++) {
+        // Inicializar centros y clases
+        VectorPuntos *centros = new VectorPuntos(casillas);
+        long *clases = (long *) malloc(sizeof(long) * muestras);
 
-   do {
-	// Coloca todos los centros en el origen
-	// Promedia los elementos del conjunto para determinar el nuevo centro
+        if (initMethod == 0) {
+            // asignación aleatoria de clases (cada punto obtiene una clase aleatoria)
+            for (long i = 0; i < muestras; ++i) clases[i] = rand() % casillas;
+            // construir primeros centros por promedio
+            construirCentrosPorPromedio(centros, muestrasVec, clases);
+        } else {
+            // initMethod == 1 => elegir R muestras aleatorias como centros iniciales
+            for (long i = 0; i < casillas; ++i) {
+                long idx = rand() % muestras;
+                (*centros)[i]->ponga( (*muestrasVec)[idx]->demeX(), (*muestrasVec)[idx]->demeY(), (*muestrasVec)[idx]->demeZ() );
+            }
+            // asignar clases inicialmente por proximidad a estos centros
+            asignarClaseMasCercana(centros, muestrasVec, clases);
+        }
 
-      cambios = 0;	// Almacena la cantidad de puntos que cambiaron de conjunto
-	// Cambia la clase de cada punto al centro más cercano
+        long totalCambios = 0;
+        long cambios;
+        int iter = 0;
+        do {
+            cambios = 0;
+            // construir centros por promedio de sus miembros
+            construirCentrosPorPromedio(centros, muestrasVec, clases);
+            // reasignar puntos al centro más cercano
+            cambios = asignarClaseMasCercana(centros, muestrasVec, clases);
+            totalCambios += cambios;
+            iter++;
+            // opcional: romper si demasiadas iteraciones
+            if (iter > 1000) break;
+        } while (cambios > 0);
 
-      totalCambios += cambios;
+        double dis = centros->disimilaridad(muestrasVec, clases);
+        printf("[Intento %d] disimilaridad=%g, iter=%d, totalCambios=%ld\n", intento+1, dis, iter, totalCambios);
 
-   } while ( cambios > 0 );	// Si no hay cambios el algoritmo converge
+        if (dis < mejorDis) {
+            mejorDis = dis;
+            mejorTotalCambios = totalCambios;
+            // copiar centros y clases a mejores
+            for (long c = 0; c < casillas; ++c) {
+                (*mejoresCentros)[c]->ponga( (*centros)[c]->demeX(), (*centros)[c]->demeY(), (*centros)[c]->demeZ() );
+            }
+            for (long i = 0; i < muestras; ++i) mejoresClases[i] = clases[i];
+        }
 
-   printf( "Valor de la disimilaridad en la solución encontrada %g, con un total de %ld cambios\n", centros->disimilaridad( puntos, clases ), totalCambios );
+        free(clases);
+        delete centros;
+    }
 
-// Con los valores encontrados genera el archivo para visualizar los resultados
-   puntos->genEpsFormat( centros, clases, (char *) "ci0117.eps" );
+    printf("Mejor disimilaridad encontrada = %g, con un total de %ld cambios\n", mejorDis, mejorTotalCambios);
 
+    // Generar eps con la mejor solución
+    mejoresCentros->genEpsFormat(muestrasVec, mejoresClases, outname);
+
+    // limpieza
+    delete muestrasVec;
+    delete mejoresCentros;
+    free(mejoresClases);
+
+    return 0;
+}
+
+// Construir centros como promedio de sus miembros. Retorna la cantidad de centros con 0 miembros (no usada) 
+long construirCentrosPorPromedio(VectorPuntos *centros, VectorPuntos *muestras, long *clases) {
+    long R = centros->demeTamano();
+    long N = muestras->demeTamano();
+    // temporal: acumular sumas y contadores
+    std::vector<Punto> sumas(R);
+    std::vector<long> cont(R, 0);
+
+    for (long i = 0; i < R; ++i) sumas[i].ponga(0,0,0);
+
+    for (long i = 0; i < N; ++i) {
+        long c = clases[i];
+        sumas[c].sume( (*muestras)[i] );
+        cont[c]++;
+    }
+
+    for (long i = 0; i < R; ++i) {
+        if (cont[i] > 0) {
+            Punto p = sumas[i];
+            p.divida((double)cont[i]);
+            (*centros)[i]->ponga( p.demeX(), p.demeY(), p.demeZ() );
+        } else {
+            // si clase sin miembros, dejar en el origen (o asignar punto aleatorio)
+            (*centros)[i]->ponga(0,0,0);
+        }
+    }
+    return 0;
+}
+
+// Asigna cada punto al centro más cercano. Retorna cantidad de cambios en esta asignación.
+long asignarClaseMasCercana(VectorPuntos *centros, VectorPuntos *muestras, long *clases) {
+    long cambios = 0;
+    long N = muestras->demeTamano();
+    for (long i = 0; i < N; ++i) {
+        long viejo = clases[i];
+        long mas = centros->masCercano( (*muestras)[i] );
+        if (mas != viejo) {
+            clases[i] = mas;
+            cambios++;
+        }
+    }
+    return cambios;
 }

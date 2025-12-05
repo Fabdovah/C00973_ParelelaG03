@@ -1,8 +1,8 @@
 /*
- *construir centros por promedio
- *asignar clase más cercana
- *Ciclo completo de k-means
- *Se hacen 3 intentos
+    Se agrega el inicio del paralelismo
+ * Asignación de puntos a su centro más cercano con OpenMP
+ * Se paraleliza el cálculo de centros usando buffers locales
+ * por hilo, reducción final con atomic
  */
 
 #include <cstdio>
@@ -121,4 +121,63 @@ long asignarClase_serial(VectorPuntos *centros, VectorPuntos *muestras, long *cl
         }
     }
     return cambios;
+}
+long asignarClase_omp(VectorPuntos *centros, VectorPuntos *muestras, long *clases) {
+    long cambios = 0;
+    long N = muestras->demeTamano();
+
+    #pragma omp parallel for reduction(+:cambios)
+    for (long i = 0; i < N; i++) {
+        long vieja = clases[i];
+        long nueva = centros->masCercano((*muestras)[i]);
+        if (nueva != vieja) {
+            clases[i] = nueva;
+            cambios++;
+        }
+    }
+    return cambios;
+}
+
+void construirCentrosPorPromedio_omp(VectorPuntos *centros, VectorPuntos *muestras, long *clases) {
+
+    long R = centros->demeTamano();
+    long N = muestras->demeTamano();
+
+    std::vector<double> sumx(R,0), sumy(R,0), sumz(R,0);
+    std::vector<long> cont(R,0);
+
+    #pragma omp parallel
+    {
+        std::vector<double> lx(R,0), ly(R,0), lz(R,0);
+        std::vector<long> lcont(R,0);
+
+        #pragma omp for nowait
+        for (long i = 0; i < N; i++) {
+            int c = clases[i];
+            lx[c] += (*muestras)[i]->demeX();
+            ly[c] += (*muestras)[i]->demeY();
+            lz[c] += (*muestras)[i]->demeZ();
+            lcont[c]++;
+        }
+
+        for (long c = 0; c < R; c++) {
+            if (lcont[c] > 0) {
+                #pragma omp atomic
+                sumx[c] += lx[c];
+                #pragma omp atomic
+                sumy[c] += ly[c];
+                #pragma omp atomic
+                sumz[c] += lz[c];
+                #pragma omp atomic
+                cont[c] += lcont[c];
+            }
+        }
+    }
+
+    for (long c = 0; c < R; c++) {
+        if (cont[c] > 0)
+            (*centros)[c]->ponga(sumx[c]/cont[c], sumy[c]/cont[c], sumz[c]/cont[c]);
+        else
+            (*centros)[c]->ponga(0,0,0);
+    }
 }

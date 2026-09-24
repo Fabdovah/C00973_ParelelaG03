@@ -1,0 +1,59 @@
+
+### make -C src/ServidorProductos
+make: Entering directory '/mnt/data/ticamazon_review/Proyecto_PI-main/Entregable2/src/ServidorProductos'
+make: Nothing to be done for 'all'.
+make: Leaving directory '/mnt/data/ticamazon_review/Proyecto_PI-main/Entregable2/src/ServidorProductos'
+
+### make -C src/Simulacion
+make: Entering directory '/mnt/data/ticamazon_review/Proyecto_PI-main/Entregable2/src/Simulacion'
+make: Nothing to be done for 'all'.
+make: Leaving directory '/mnt/data/ticamazon_review/Proyecto_PI-main/Entregable2/src/Simulacion'
+
+### g++ -std=c++17 -Wall -Wextra -pthread tests/filesystem_test.cc src/ServidorProductos/filesystem.cc -o tests/results/filesystem_test
+
+### tests/results/filesystem_test
+Bodega 'Test'ID: 1
+Bodega 1 guardada en disco
+Nuevo bloque agregado. Total de bloques: 2
+Producto agregado: ID=1, Nombre=item1, Bloque=1, Posicion=0
+Bodega 1 guardada en disco
+Producto agregado: ID=2, Nombre=item2, Bloque=1, Posicion=1
+Bodega 1 guardada en disco
+Producto agregado: ID=3, Nombre=item3, Bloque=1, Posicion=2
+Bodega 1 guardada en disco
+Producto agregado: ID=4, Nombre=item4, Bloque=1, Posicion=3
+Bodega 1 guardada en disco
+Producto agregado: ID=5, Nombre=item5, Bloque=1, Posicion=4
+Bodega 1 guardada en disco
+Nuevo bloque agregado. Total de bloques: 2
+Producto agregado: ID=6, Nombre=item6, Bloque=2, Posicion=0
+Bodega 1 guardada en disco
+Cantidad actualizada a: 4
+Bodega 1 guardada en disco
+Precio actualizado a: 12.75
+Bodega 1 guardada en disco
+Bodega 1 guardada en disco
+Bodega 1 cargada desde disco
+Producto del ID =6 eliminado correctamente
+Bodega 1 guardada en disco
+Bodega 1 guardada en disco
+Bodega 1 cargada desde disco
+Bodega 1 guardada en disco
+PASS: alta, busqueda, crecimiento, modificacion, persistencia y baja
+
+### python3 -m unittest discover -s tests -p test_*.py -v
+test_01_categories_json (test_http.HTTPTest.test_01_categories_json) ... ok
+test_02_categories_html (test_http.HTTPTest.test_02_categories_html) ... ok
+test_03_products (test_http.HTTPTest.test_03_products) ... ok
+test_04_missing_filter (test_http.HTTPTest.test_04_missing_filter) ... ok
+test_05_unknown_endpoint (test_http.HTTPTest.test_05_unknown_endpoint) ... ok
+test_06_buy_validation (test_http.HTTPTest.test_06_buy_validation) ... ok
+test_07_buy_stock_and_persistence (test_http.HTTPTest.test_07_buy_stock_and_persistence) ... ok
+test_08_parallel_buy_no_oversell (test_http.HTTPTest.test_08_parallel_buy_no_oversell) ... ok
+test_registration_query_and_clean_exit (test_simulation.SimulationSmokeTest.test_registration_query_and_clean_exit) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.128s
+
+OK
+RESULTADO: SUITE AUTOMATIZADA SIN FALLOS (ver skips)
